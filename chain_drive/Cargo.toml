@@ -1,7 +1,6 @@
 [package]
-name = "Az_zy"
+name = "chain_drive"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-chain_drive = { path = "chain_drive" }
