@@ -11,39 +11,31 @@ impl ChainDrive {
         return ChainDrive { channels: HashMap::new() }
     }
 
-    pub fn push_front<P: ChainPayload + 'static, T: ChainBlock<P> + 'static>(&mut self, block: T) {
-        match self.channels.remove(&TypeId::of::<P>()) {
-            Some(channel) => {
-                if let Ok(mut channel) = channel.downcast::<ChainChannel<P>>() {
-                    channel.push_front(block);
-                    self.channels.insert(TypeId::of::<P>(), channel);
-                } else {
-                    panic!("Something went wrong in the chain drive, chain channel for {} is mismatched", std::any::type_name::<P>())
-                }
-            }
-            None => {
-                let mut channel = ChainChannel::new();
-                channel.push_front(block);
-                self.channels.insert(TypeId::of::<P>(), Box::new(channel));
-            }
+    fn run_in_channel<P, F>(&mut self, func: F)
+    where
+        P: ChainPayload + 'static,
+        F: FnOnce(&mut ChainChannel<P>)
+    {
+        let entry = self.channels
+            .entry(TypeId::of::<P>())
+            .or_insert_with(|| Box::new(ChainChannel::<P>::new()));
+
+        if let Some(channel) = entry.downcast_mut::<ChainChannel<P>>() {
+            func(channel);
+        } else {
+            panic!("Channel type mismatch for {}", std::any::type_name::<P>());
         }
     }
 
+    pub fn push_front<P: ChainPayload + 'static, T: ChainBlock<P> + 'static>(&mut self, block: T) {
+        self.run_in_channel(move |channel: &mut ChainChannel<P>| {
+            channel.push_front(block);
+        });
+    }
+
     pub fn run<P: ChainPayload + 'static>(&mut self, payload: P) {
-        match self.channels.remove(&TypeId::of::<P>()) {
-            Some(channel) => {
-                if let Ok(mut channel) = channel.downcast::<ChainChannel<P>>() {
-                    channel.run(payload);
-                    self.channels.insert(TypeId::of::<P>(), channel);
-                } else {
-                    panic!("Something went wrong in the chain drive, chain channel for {} is mismatched", std::any::type_name::<P>())
-                }
-            }
-            None => {
-                let mut channel = ChainChannel::new();
-                channel.run(payload);
-                self.channels.insert(TypeId::of::<P>(), Box::new(channel));
-            }
-        }
+        self.run_in_channel(move |channel: &mut ChainChannel<P>| {
+            channel.run(payload);
+        });
     }
 }
