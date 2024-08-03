@@ -1,4 +1,2 @@
-mod core {
-    include!("core/chain_channel.rs");
-}
-pub use core::{ChainChannel, ChainBlock, ChainPayload};
+mod core;
+pub use core::{ChainDrive, ChainBlock, ChainPayload};

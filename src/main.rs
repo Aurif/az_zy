@@ -1,14 +1,18 @@
-use chain_drive::{ChainChannel, ChainBlock, ChainPayload};
+use chain_drive::{ChainDrive, ChainBlock, ChainPayload};
 fn main() {
     let start = Payload { history: String::new() };
-    let mut channel = ChainChannel::new();
-    channel.push_front(BlockA {});
-    channel.push_front(BlockB {label: 'B'});
-    channel.push_back(BlockB {label: 'C'});
-    channel.push_back(BlockB {label: 'D'});
-    channel.push_back(BlockB {label: 'E'});
-    channel.push_front(BlockA {});
-    channel.run(start)
+    let mut drive = ChainDrive::new();
+    drive.push_front(BlockA {});
+    drive.push_front(BlockB {label: 'B'});
+    // drive.push_back(BlockB {label: 'C'});
+    // drive.push_back(BlockB {label: 'D'});
+    // drive.push_back(BlockB {label: 'E'});
+    drive.push_front(BlockA {});
+    drive.push_front(BlockC {});
+    drive.run(start);
+    println!("------");
+    let start = Payload2 { history: String::new() };
+    drive.run(start);
 }
 
 
@@ -38,3 +42,17 @@ struct Payload {
     history: String
 }
 impl ChainPayload for Payload {}
+
+struct BlockC;
+impl ChainBlock<Payload2> for BlockC {
+    fn run(&self, payload: Payload2, next: &dyn Fn(Payload2)) {
+        let new_labels = format!("{}{}", payload.history, "+");
+        println!("-> {}", new_labels);
+        next(Payload2 { history: new_labels});
+    }
+}
+
+struct Payload2 {
+    history: String
+}
+impl ChainPayload for Payload2 {}
