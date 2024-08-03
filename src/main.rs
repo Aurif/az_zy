@@ -4,9 +4,9 @@ fn main() {
     let mut drive = ChainDrive::new();
     drive.push_front(BlockA {});
     drive.push_front(BlockB {label: 'B'});
-    // drive.push_back(BlockB {label: 'C'});
-    // drive.push_back(BlockB {label: 'D'});
-    // drive.push_back(BlockB {label: 'E'});
+    drive.push_back(BlockB {label: 'C'});
+    drive.push_back(BlockB {label: 'D'});
+    drive.push_back(BlockB {label: 'E'});
     drive.push_front(BlockA {});
     drive.push_front(BlockC {});
     drive.run(start);
