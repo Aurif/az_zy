@@ -4,14 +4,14 @@ use crate::{ChainBlock, ChainPayload};
 use crate::core::ChainChannel;
 
 pub struct ChainDrive {
-    pub channels: HashMap<TypeId, Box<dyn Any>>
+    channels: HashMap<TypeId, Box<dyn Any>>
 }
 impl ChainDrive {
     pub fn new() -> ChainDrive {
         return ChainDrive { channels: HashMap::new() }
     }
 
-    fn get_channel<P: ChainPayload + 'static>(&mut self) -> &mut ChainChannel<P> {
+    fn get_channel_mut<P: ChainPayload + 'static>(&mut self) -> &mut ChainChannel<P> {
         let entry = self.channels
             .entry(TypeId::of::<P>())
             .or_insert_with(|| Box::new(ChainChannel::<P>::new()));
@@ -22,15 +22,34 @@ impl ChainDrive {
         panic!("Channel type mismatch for {}", std::any::type_name::<P>());
     }
 
+    fn get_channel<P: ChainPayload + 'static>(&self) -> &ChainChannel<P> {
+        let entry = self.channels
+            .get(&TypeId::of::<P>())
+            .expect(&format!("Channel missing for {}", std::any::type_name::<P>()));
+
+        if let Some(channel) = entry.downcast_ref::<ChainChannel<P>>() {
+            return channel;
+        }
+        panic!("Channel type mismatch for {}", std::any::type_name::<P>());
+    }
+
     pub fn push_front<P: ChainPayload + 'static, T: ChainBlock<P> + 'static>(&mut self, block: T) {
-        self.get_channel().push_front(block);
+        self.get_channel_mut().push_front(block);
     }
 
     pub fn push_back<P: ChainPayload + 'static, T: ChainBlock<P> + 'static>(&mut self, block: T) {
-        self.get_channel().push_back(block);
+        self.get_channel_mut().push_back(block);
     }
 
-    pub fn run<P: ChainPayload + 'static>(&mut self, payload: P) {
-        self.get_channel().run(payload);
+    pub fn run<P: ChainPayload + 'static>(&self, payload: P) {
+        self.get_channel().run(payload, &ChainJumper {owner: self});
+    }
+}
+pub struct ChainJumper<'a> {
+    owner: &'a ChainDrive
+}
+impl ChainJumper<'_> {
+    pub fn to<P: ChainPayload + 'static>(&self, payload: P) {
+        self.owner.run(payload)
     }
 }
