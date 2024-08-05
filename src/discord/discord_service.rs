@@ -1,3 +1,4 @@
+use std::sync::{Arc, Weak};
 use serenity::{async_trait, Client};
 use serenity::all::{Context, EventHandler, GatewayIntents, Message};
 
@@ -7,7 +8,9 @@ pub struct DiscordService {
 impl DiscordService {
     pub async fn new() -> DiscordService {
         DiscordService {
-            handler: DiscordServiceHandler {}
+            handler: DiscordServiceHandler {
+                message_listeners: Vec::new()
+            }
         }
     }
 
@@ -24,16 +27,31 @@ impl DiscordService {
             println!("Discord client error: {why:?}");
         }
     }
+
+    pub fn dm_listener_block(&mut self) -> Arc<DiscordDMListenerBlock> {
+        let block = Arc::new(DiscordDMListenerBlock {});
+        self.handler.message_listeners.push(Arc::downgrade(&block));
+        block
+    }
 }
 
-struct DiscordServiceHandler;
+struct DiscordServiceHandler {
+    message_listeners: Vec<Weak<DiscordDMListenerBlock>>
+}
 #[async_trait]
 impl EventHandler for DiscordServiceHandler {
     async fn message(&self, ctx: Context, msg: Message) {
-        if msg.content == "!ping" {
-            if let Err(why) = msg.channel_id.say(&ctx.http, "uwu!").await {
-                println!("Error sending message: {why:?}");
+        for weak_ref in &self.message_listeners {
+            if let Some(listener) = weak_ref.upgrade() {
+                listener.message(&ctx, &msg)
             }
         }
+    }
+}
+
+pub struct DiscordDMListenerBlock;
+impl DiscordDMListenerBlock {
+    fn message(&self, ctx: &Context, msg: &Message) {
+        println!("{}", msg.content)
     }
 }
