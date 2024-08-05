@@ -1,4 +1,5 @@
 use crate::core::chain_drive::ChainJumper;
+use crate::core::common::{ChainBlock, ChainPayload};
 
 pub struct ChainChannel<P: ChainPayload> {
     queue_front: Vec<Box<dyn ChainBlock<P>>>,
@@ -36,9 +37,3 @@ impl<P: ChainPayload> ChainChannel<P> {
         }
     }
 }
-
-pub trait ChainBlock<P: ChainPayload> {
-    fn run(&self, payload: P, next: &dyn Fn(P), jump: &ChainJumper);
-}
-
-pub trait ChainPayload {}

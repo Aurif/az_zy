@@ -1,4 +1,5 @@
 use std::sync::{Arc, Weak};
+use chain_drive::{ChainBlock, ChainJumper, InitPayload};
 use serenity::{async_trait, Client};
 use serenity::all::{Context, EventHandler, GatewayIntents, Message};
 
@@ -53,5 +54,11 @@ pub struct DiscordDMListenerBlock;
 impl DiscordDMListenerBlock {
     fn message(&self, ctx: &Context, msg: &Message) {
         println!("{}", msg.content)
+    }
+}
+impl ChainBlock<InitPayload> for DiscordDMListenerBlock {
+    fn run(&self, payload: InitPayload, next: &dyn Fn(InitPayload), jump: &ChainJumper) {
+        println!("Initiated!");
+        next(payload);
     }
 }

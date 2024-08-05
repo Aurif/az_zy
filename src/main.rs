@@ -1,3 +1,4 @@
+use chain_drive::ChainDrive;
 use crate::discord::DiscordService;
 
 mod discord;
@@ -6,7 +7,9 @@ mod discord;
 async fn main() {
     let mut discord = DiscordService::new().await;
 
-    let block = discord.dm_listener_block();
+    let mut drive = ChainDrive::new();
+    drive.push_front(discord.dm_listener_block());
+    drive.start();
 
     discord.start().await;
 }

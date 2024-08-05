@@ -1,7 +1,7 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
-use crate::{ChainBlock, ChainPayload};
 use crate::core::ChainChannel;
+use crate::core::common::{ChainBlock, ChainPayload};
 
 pub struct ChainDrive {
     channels: HashMap<TypeId, Box<dyn Any>>
@@ -41,8 +41,12 @@ impl ChainDrive {
         self.get_channel_mut().push_back(block);
     }
 
-    pub fn run<P: ChainPayload + 'static>(&self, payload: P) {
+    fn run_channel<P: ChainPayload + 'static>(&self, payload: P) {
         self.get_channel().run(payload, &ChainJumper {owner: self});
+    }
+
+    pub fn start(&self) {
+        self.run_channel(InitPayload {});
     }
 }
 pub struct ChainJumper<'a> {
@@ -50,6 +54,9 @@ pub struct ChainJumper<'a> {
 }
 impl ChainJumper<'_> {
     pub fn to<P: ChainPayload + 'static>(&self, payload: P) {
-        self.owner.run(payload)
+        self.owner.run_channel(payload)
     }
 }
+
+pub struct InitPayload;
+impl ChainPayload for InitPayload {}
