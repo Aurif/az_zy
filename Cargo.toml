@@ -5,3 +5,5 @@ edition = "2021"
 
 [dependencies]
 chain_drive = { path = "chain_drive" }
+tokio = { version = "1.39.2", features = ["full"] }
+serenity = "0.12.2"
