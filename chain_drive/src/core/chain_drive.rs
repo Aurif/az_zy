@@ -1,8 +1,10 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock, Weak};
+use std::sync::{Arc, Mutex, RwLock, Weak};
+use crate::{ChainBlockRef, ChainJumpResult};
+use crate::core::chain_block::ChainBlock;
 use crate::core::ChainChannel;
-use crate::core::common::{ChainBlock, ChainPayload};
+use crate::core::common::ChainPayload;
 
 pub struct ChainDrive {
     core: Arc<RwLock<ChainDriveCore>>
@@ -13,19 +15,24 @@ impl ChainDrive {
         return ChainDrive { core }
     }
 
-    pub fn push_front<P: ChainPayload + 'static, T: ChainBlock<P> + 'static>(&mut self, block: T) {
+    pub fn push_front<P: ChainPayload + 'static>(&mut self, block: Arc<Mutex<dyn ChainBlock<P>>>) {
         self.core.write().unwrap().get_channel_mut().push_front(block)
     }
 
-    pub fn push_back<P: ChainPayload + 'static, T: ChainBlock<P> + 'static>(&mut self, block: T) {
+    pub fn push_back<P: ChainPayload + 'static>(&mut self, block: Arc<Mutex<dyn ChainBlock<P>>>) {
         self.core.write().unwrap().get_channel_mut().push_back(block)
+    }
+
+    pub fn insert(&mut self, block: impl ChainBlockRef) {
+        let block = Arc::new(Mutex::new(block));
+        ChainBlockRef::insert_into(block, self)
     }
 
     pub fn start(&self) {
         let jumper = ChainJumper {
             core: Arc::downgrade(&self.core)
         };
-        jumper.to(InitPayload {})
+        jumper.to(InitPayload {}).progress()
     }
 }
 
@@ -66,10 +73,16 @@ pub struct ChainJumper {
     core: Weak<RwLock<ChainDriveCore>>
 }
 impl ChainJumper {
-    pub fn to<P: ChainPayload + 'static>(&self, payload: P) {
+    pub fn to<P: ChainPayload + 'static>(&self, payload: P) -> ChainJumpResult {
         if let Some(core) = self.core.upgrade() {
-            core.read().unwrap().get_channel().run(payload, &self)
+            let self_clone = self.clone();
+            return ChainJumpResult::from_func(Box::new(move || {core.read().unwrap().get_channel().run(payload, &self_clone)}))
         }
+        ChainJumpResult::from_blank()
+    }
+
+    pub fn stop(&self) -> ChainJumpResult {
+        ChainJumpResult::from_blank()
     }
 }
 

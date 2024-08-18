@@ -1,13 +1,21 @@
-use std::sync::Arc;
-use crate::ChainJumper;
+pub trait ChainPayload {}
 
-pub trait ChainBlock<P: ChainPayload>: Send+Sync {
-    fn run(&self, payload: P, next: &dyn Fn(P), jump: &ChainJumper);
+pub struct ChainJumpResult {
+    func: Box<dyn FnOnce()>
 }
-impl<P: ChainPayload, C: ChainBlock<P>> ChainBlock<P> for Arc<C> {
-    fn run(&self, payload: P, next: &dyn Fn(P), jump: &ChainJumper) {
-        self.as_ref().run(payload, next, jump)
+impl ChainJumpResult {
+    pub(crate) fn from_func(func: Box<dyn FnOnce()>) -> ChainJumpResult {
+        ChainJumpResult {
+            func
+        }
+    }
+
+    pub(crate) fn from_blank() -> ChainJumpResult {
+        ChainJumpResult {
+            func: Box::new(|| {})
+        }
+    }
+    pub fn progress(self) {
+        (self.func)()
     }
 }
-
-pub trait ChainPayload {}

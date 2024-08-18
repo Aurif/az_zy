@@ -64,15 +64,15 @@ impl DiscordDMListenerBlock {
         if let Some(jumper) = self.chain_jumper.read().unwrap().as_ref() {
             jumper.to(DiscordDMReceivedPayload {
                 content: msg.content.clone()
-            })
+            }).progress()
         }
     }
 }
-impl ChainBlock<InitPayload> for DiscordDMListenerBlock {
-    fn run(&self, payload: InitPayload, next: &dyn Fn(InitPayload), jump: &ChainJumper) {
-        println!("Initiated!");
-        let mut chain_jumper = self.chain_jumper.write().unwrap();
-        *chain_jumper = Some(jump.clone());
-        next(payload);
-    }
-}
+// impl ChainBlock<InitPayload> for DiscordDMListenerBlock {
+//     fn run(&self, payload: InitPayload, next: &dyn Fn(InitPayload), jump: &ChainJumper) {
+//         println!("Initiated!");
+//         let mut chain_jumper = self.chain_jumper.write().unwrap();
+//         *chain_jumper = Some(jump.clone());
+//         next(payload);
+//     }
+// }

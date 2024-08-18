@@ -1,7 +1,9 @@
 mod chain_drive;
 mod chain_channel;
 mod common;
+mod chain_block;
 
 pub use chain_channel::ChainChannel;
 pub use chain_drive::{ChainDrive, ChainJumper, InitPayload};
-pub use common::{ChainBlock, ChainPayload};
+pub use common::{ChainPayload, ChainJumpResult};
+pub use chain_block::{ChainBlock, ChainBlockRef};
