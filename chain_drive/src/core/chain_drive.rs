@@ -1,8 +1,8 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock, Weak};
-use crate::{ChainBlockRef, ChainJumpResult};
-use crate::core::chain_block::ChainBlock;
+use crate::{ChainJumpResult};
+use crate::core::chain_block::{ChainBlock, ChainBlockInserter};
 use crate::core::ChainChannel;
 use crate::core::common::ChainPayload;
 
@@ -23,9 +23,8 @@ impl ChainDrive {
         self.core.write().unwrap().get_channel_mut().push_back(block)
     }
 
-    pub fn insert(&mut self, block: impl ChainBlockRef) {
-        let block = Arc::new(Mutex::new(block));
-        ChainBlockRef::insert_into(block, self)
+    pub fn insert(&mut self, block: impl ChainBlockInserter) {
+        block.insert_into(self)
     }
 
     pub fn start(&self) {

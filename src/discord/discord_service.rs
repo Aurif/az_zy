@@ -1,5 +1,5 @@
-use std::sync::{Arc, RwLock, Weak};
-use chain_drive::{ChainBlock, ChainJumper, InitPayload};
+use std::sync::{Arc, Mutex, RwLock, Weak};
+use chain_drive::{ChainJumper, ChainJumpResult, define_block, InitPayload};
 use serenity::{async_trait, Client};
 use serenity::all::{Context, EventHandler, GatewayIntents, Message};
 use crate::discord::channels::DiscordDMReceivedPayload;
@@ -30,49 +30,52 @@ impl DiscordService {
         }
     }
 
-    pub fn dm_listener_block(&mut self) -> Arc<DiscordDMListenerBlock> {
-        let block = Arc::new(DiscordDMListenerBlock::new());
+    pub fn dm_listener_block(&mut self) -> Arc<Mutex<DiscordDMListenerBlock>> {
+        let block = Arc::new(Mutex::new(DiscordDMListenerBlock::new()));
         self.handler.message_listeners.push(Arc::downgrade(&block));
         block
     }
 }
 
 struct DiscordServiceHandler {
-    message_listeners: Vec<Weak<DiscordDMListenerBlock>>
+    message_listeners: Vec<Weak<Mutex<DiscordDMListenerBlock>>>
 }
 #[async_trait]
 impl EventHandler for DiscordServiceHandler {
     async fn message(&self, ctx: Context, msg: Message) {
         for weak_ref in &self.message_listeners {
             if let Some(listener) = weak_ref.upgrade() {
-                listener.message(&ctx, &msg)
+                listener.try_lock().expect("Cannot call, listener blocked").message(&ctx, &msg)
             }
         }
     }
 }
 
-pub struct DiscordDMListenerBlock {
-    chain_jumper: RwLock<Option<ChainJumper>>
-}
-impl DiscordDMListenerBlock {
-    fn new<'a>() -> DiscordDMListenerBlock {
-        DiscordDMListenerBlock {
-            chain_jumper: RwLock::new(None)
+define_block!(
+    pub struct DiscordDMListenerBlock {
+        chain_jumper: RwLock<Option<ChainJumper>>
+    }
+    impl {
+        fn new<'a>() -> DiscordDMListenerBlock {
+            DiscordDMListenerBlock {
+                chain_jumper: RwLock::new(None)
+            }
+        }
+        fn message(&self, _ctx: &Context, msg: &Message) {
+            if let Some(jumper) = self.chain_jumper.read().unwrap().as_ref() {
+                jumper.to(DiscordDMReceivedPayload {
+                    content: msg.content.clone()
+                }).progress()
+            }
         }
     }
-    fn message(&self, _ctx: &Context, msg: &Message) {
-        if let Some(jumper) = self.chain_jumper.read().unwrap().as_ref() {
-            jumper.to(DiscordDMReceivedPayload {
-                content: msg.content.clone()
-            }).progress()
+    impl for InitPayload {
+        fn run(&self, _payload: InitPayload, _next: &dyn Fn(InitPayload), jump: &ChainJumper) -> ChainJumpResult {
+            println!("Initiated!");
+            let mut chain_jumper = self.chain_jumper.write().unwrap();
+            *chain_jumper = Some(jump.clone());
+            // next(payload);
+            jump.stop()
         }
     }
-}
-// impl ChainBlock<InitPayload> for DiscordDMListenerBlock {
-//     fn run(&self, payload: InitPayload, next: &dyn Fn(InitPayload), jump: &ChainJumper) {
-//         println!("Initiated!");
-//         let mut chain_jumper = self.chain_jumper.write().unwrap();
-//         *chain_jumper = Some(jump.clone());
-//         next(payload);
-//     }
-// }
+);

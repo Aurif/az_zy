@@ -1,6 +1,5 @@
 use std::any::Any;
-use std::sync::{Arc, Mutex};
-use chain_drive::{ChainBlock, ChainBlockRef, ChainDrive, ChainJumper, ChainJumpResult, ChainPayload, InitPayload};
+use chain_drive::{ChainDrive, ChainJumper, ChainJumpResult, InitPayload, define_block};
 use crate::discord::channels::DiscordDMReceivedPayload;
 use crate::discord::DiscordService;
 
@@ -11,31 +10,13 @@ async fn main() {
     let mut discord = DiscordService::new().await;
 
     let mut drive = ChainDrive::new();
-    // drive.push_front(discord.dm_listener_block());
-    // drive.push_front(DisplayBlock{});
+    drive.insert(discord.dm_listener_block());
     drive.insert(DisplayBlock{});
     drive.start();
 
-    // discord.start().await;
+    discord.start().await;
 }
 
-macro_rules! define_block {
-    ( struct $name:ident; $(impl for $t:ty { $($code:tt)* })* ) => {
-        struct $name;
-        $(
-            impl ChainBlock<$t> for $name {
-                $($code)*
-            }
-        )*
-        impl ChainBlockRef for $name {
-            fn insert_into(self_ref: Arc<Mutex<Self>>, chain_drive: &mut ChainDrive) {
-                $(
-                    chain_drive.push_front(self_ref.clone() as Arc<Mutex<dyn ChainBlock<$t>>>);
-                )*
-            }
-        }
-    }
-}
 define_block!(
     struct DisplayBlock;
     impl for DiscordDMReceivedPayload {
