@@ -1,5 +1,6 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, RwLock, Weak};
 use crate::{ChainJumpResult};
 use crate::core::chain_block::{ChainBlock, ChainBlockInserter};
@@ -28,10 +29,10 @@ impl ChainDrive {
     }
 
     pub fn start(&self) {
-        let jumper = ChainJumper {
-            core: Arc::downgrade(&self.core)
+        let jumper = ChainJumperCore {
+            drive_core: Arc::downgrade(&self.core)
         };
-        jumper.to(InitPayload {}).progress()
+        jumper.direct_to(InitPayload {}, 0).enter()
     }
 }
 
@@ -68,20 +69,53 @@ impl ChainDriveCore {
 }
 
 #[derive(Clone)]
-pub struct ChainJumper {
-    core: Weak<RwLock<ChainDriveCore>>
+pub struct ChainJumperCore {
+    drive_core: Weak<RwLock<ChainDriveCore>>
 }
-impl ChainJumper {
-    pub fn to<P: ChainPayload + 'static>(&self, payload: P) -> ChainJumpResult {
-        if let Some(core) = self.core.upgrade() {
+impl ChainJumperCore {
+    fn direct_to<P: ChainPayload + 'static>(&self, payload: P, index: usize) -> ChainJumpResult {
+        if let Some(core) = self.drive_core.upgrade() {
             let self_clone = self.clone();
-            return ChainJumpResult::from_func(Box::new(move || {core.read().unwrap().get_channel().run(payload, &self_clone)}))
+            return ChainJumpResult::from_func(Box::new(move || {
+                core.read().unwrap().get_channel().run_at_index(payload, &self_clone, index)
+            }))
         }
         ChainJumpResult::from_blank()
     }
 
+    pub fn emit<P: ChainPayload + 'static>(&self, payload: P) {
+        self.direct_to(payload, 0).enter()
+    }
+
+    pub(crate) fn arm<P: ChainPayload>(&self, next_index: usize) -> ChainJumper<P> {
+        ChainJumper::<P> {
+            core: self.clone(),
+            next_index,
+            phantom: PhantomData
+        }
+    }
+}
+
+pub struct ChainJumper<N: ChainPayload> {
+    core: ChainJumperCore,
+    next_index: usize,
+    phantom: PhantomData<N>,
+}
+impl<N: ChainPayload + 'static> ChainJumper<N> {
+    pub fn to<P: ChainPayload + 'static>(&self, payload: P) -> ChainJumpResult {
+        self.core.direct_to(payload, 0)
+    }
+
     pub fn stop(&self) -> ChainJumpResult {
         ChainJumpResult::from_blank()
+    }
+
+    pub fn next(&self, payload: N) -> ChainJumpResult {
+        self.core.direct_to(payload, self.next_index)
+    }
+
+    pub fn get_core(&self) -> ChainJumperCore {
+        self.core.clone()
     }
 }
 

@@ -15,7 +15,7 @@ impl ChainJumpResult {
             func: Box::new(|| {})
         }
     }
-    pub fn progress(self) {
+    pub fn enter(self) {
         (self.func)()
     }
 }

@@ -20,13 +20,13 @@ async fn main() {
 define_block!(
     struct DisplayBlock;
     impl for DiscordDMReceivedPayload {
-        fn run(&self, payload: DiscordDMReceivedPayload, _next: &dyn Fn(DiscordDMReceivedPayload), jump: &ChainJumper) -> ChainJumpResult {
+        fn run(&self, payload: DiscordDMReceivedPayload, jump: ChainJumper<DiscordDMReceivedPayload>) -> ChainJumpResult {
             println!("Received \"{}\"", payload.content);
             jump.stop()
         }
     }
     impl for InitPayload {
-        fn run(&self, _payload: InitPayload, _next: &dyn Fn(InitPayload), jump: &ChainJumper) -> ChainJumpResult {
+        fn run(&self, _payload: InitPayload, jump: ChainJumper<InitPayload>) -> ChainJumpResult {
             println!("Fake init!");
             jump.to(DiscordDMReceivedPayload {content: String::from("More faking!")})
         }

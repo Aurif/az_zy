@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex, RwLock, Weak};
-use chain_drive::{ChainJumper, ChainJumpResult, define_block, InitPayload};
+use chain_drive::{ChainJumper, ChainJumperCore, ChainJumpResult, define_block, InitPayload};
 use serenity::{async_trait, Client};
 use serenity::all::{Context, EventHandler, GatewayIntents, Message};
 use crate::discord::channels::DiscordDMReceivedPayload;
@@ -53,7 +53,7 @@ impl EventHandler for DiscordServiceHandler {
 
 define_block!(
     pub struct DiscordDMListenerBlock {
-        chain_jumper: RwLock<Option<ChainJumper>>
+        chain_jumper: RwLock<Option<ChainJumperCore>>
     }
     impl {
         fn new<'a>() -> DiscordDMListenerBlock {
@@ -63,19 +63,18 @@ define_block!(
         }
         fn message(&self, _ctx: &Context, msg: &Message) {
             if let Some(jumper) = self.chain_jumper.read().unwrap().as_ref() {
-                jumper.to(DiscordDMReceivedPayload {
+                jumper.emit(DiscordDMReceivedPayload {
                     content: msg.content.clone()
-                }).progress()
+                })
             }
         }
     }
     impl for InitPayload {
-        fn run(&self, _payload: InitPayload, _next: &dyn Fn(InitPayload), jump: &ChainJumper) -> ChainJumpResult {
+        fn run(&self, payload: InitPayload, jump: ChainJumper<InitPayload>) -> ChainJumpResult {
             println!("Initiated!");
             let mut chain_jumper = self.chain_jumper.write().unwrap();
-            *chain_jumper = Some(jump.clone());
-            // next(payload);
-            jump.stop()
+            *chain_jumper = Some(jump.get_core());
+            jump.next(payload)
         }
     }
 );

@@ -3,7 +3,7 @@ use crate::{ChainDrive, ChainJumper, ChainPayload};
 use crate::core::common::ChainJumpResult;
 
 pub trait ChainBlock<P: ChainPayload>: Send+Sync {
-    fn run(&self, payload: P, next: &dyn Fn(P), jump: &ChainJumper) -> ChainJumpResult;
+    fn run(&self, payload: P, jump: ChainJumper<P>) -> ChainJumpResult;
 }
 
 pub trait ChainBlockRef {
