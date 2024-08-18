@@ -1,7 +1,8 @@
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, RwLock, Weak};
 use chain_drive::{ChainBlock, ChainJumper, InitPayload};
 use serenity::{async_trait, Client};
 use serenity::all::{Context, EventHandler, GatewayIntents, Message};
+use crate::discord::channels::DiscordDMReceivedPayload;
 
 pub struct DiscordService {
     handler: DiscordServiceHandler
@@ -30,7 +31,7 @@ impl DiscordService {
     }
 
     pub fn dm_listener_block(&mut self) -> Arc<DiscordDMListenerBlock> {
-        let block = Arc::new(DiscordDMListenerBlock {});
+        let block = Arc::new(DiscordDMListenerBlock::new());
         self.handler.message_listeners.push(Arc::downgrade(&block));
         block
     }
@@ -50,15 +51,28 @@ impl EventHandler for DiscordServiceHandler {
     }
 }
 
-pub struct DiscordDMListenerBlock;
+pub struct DiscordDMListenerBlock {
+    chain_jumper: RwLock<Option<ChainJumper>>
+}
 impl DiscordDMListenerBlock {
-    fn message(&self, ctx: &Context, msg: &Message) {
-        println!("{}", msg.content)
+    fn new<'a>() -> DiscordDMListenerBlock {
+        DiscordDMListenerBlock {
+            chain_jumper: RwLock::new(None)
+        }
+    }
+    fn message(&self, _ctx: &Context, msg: &Message) {
+        if let Some(jumper) = self.chain_jumper.read().unwrap().as_ref() {
+            jumper.to(DiscordDMReceivedPayload {
+                content: msg.content.clone()
+            })
+        }
     }
 }
 impl ChainBlock<InitPayload> for DiscordDMListenerBlock {
     fn run(&self, payload: InitPayload, next: &dyn Fn(InitPayload), jump: &ChainJumper) {
         println!("Initiated!");
+        let mut chain_jumper = self.chain_jumper.write().unwrap();
+        *chain_jumper = Some(jump.clone());
         next(payload);
     }
 }

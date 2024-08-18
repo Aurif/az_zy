@@ -1,14 +1,40 @@
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock, Weak};
 use crate::core::ChainChannel;
 use crate::core::common::{ChainBlock, ChainPayload};
 
 pub struct ChainDrive {
-    channels: HashMap<TypeId, Box<dyn Any>>
+    core: Arc<RwLock<ChainDriveCore>>
 }
 impl ChainDrive {
     pub fn new() -> ChainDrive {
-        return ChainDrive { channels: HashMap::new() }
+        let core = Arc::new(RwLock::new(ChainDriveCore::new()));
+        return ChainDrive { core }
+    }
+
+    pub fn push_front<P: ChainPayload + 'static, T: ChainBlock<P> + 'static>(&mut self, block: T) {
+        self.core.write().unwrap().get_channel_mut().push_front(block)
+    }
+
+    pub fn push_back<P: ChainPayload + 'static, T: ChainBlock<P> + 'static>(&mut self, block: T) {
+        self.core.write().unwrap().get_channel_mut().push_back(block)
+    }
+
+    pub fn start(&self) {
+        let jumper = ChainJumper {
+            core: Arc::downgrade(&self.core)
+        };
+        jumper.to(InitPayload {})
+    }
+}
+
+pub struct ChainDriveCore {
+    channels: HashMap<TypeId, Box<dyn Any + Send + Sync>>
+}
+impl ChainDriveCore {
+    fn new() -> ChainDriveCore {
+        return ChainDriveCore { channels: HashMap::new() }
     }
 
     fn get_channel_mut<P: ChainPayload + 'static>(&mut self) -> &mut ChainChannel<P> {
@@ -33,28 +59,17 @@ impl ChainDrive {
         panic!("Channel type mismatch for {}", std::any::type_name::<P>());
     }
 
-    pub fn push_front<P: ChainPayload + 'static, T: ChainBlock<P> + 'static>(&mut self, block: T) {
-        self.get_channel_mut().push_front(block);
-    }
-
-    pub fn push_back<P: ChainPayload + 'static, T: ChainBlock<P> + 'static>(&mut self, block: T) {
-        self.get_channel_mut().push_back(block);
-    }
-
-    fn run_channel<P: ChainPayload + 'static>(&self, payload: P) {
-        self.get_channel().run(payload, &ChainJumper {owner: self});
-    }
-
-    pub fn start(&self) {
-        self.run_channel(InitPayload {});
-    }
 }
-pub struct ChainJumper<'a> {
-    owner: &'a ChainDrive
+
+#[derive(Clone)]
+pub struct ChainJumper {
+    core: Weak<RwLock<ChainDriveCore>>
 }
-impl ChainJumper<'_> {
+impl ChainJumper {
     pub fn to<P: ChainPayload + 'static>(&self, payload: P) {
-        self.owner.run_channel(payload)
+        if let Some(core) = self.core.upgrade() {
+            core.read().unwrap().get_channel().run(payload, &self)
+        }
     }
 }
 
