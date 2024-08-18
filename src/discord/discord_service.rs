@@ -1,5 +1,5 @@
 use std::sync::{Arc, Mutex, RwLock, Weak};
-use chain_drive::{ChainJumper, ChainJumperCore, ChainJumpResult, define_block, InitPayload};
+use chain_drive::{ChainBFront, ChainJumper, ChainJumperCore, ChainJumpResult, define_block, InitPayload};
 use serenity::{async_trait, Client};
 use serenity::all::{Context, EventHandler, GatewayIntents, Message};
 use crate::discord::channels::DiscordDMReceivedPayload;
@@ -69,7 +69,7 @@ define_block!(
             }
         }
     }
-    impl for InitPayload {
+    impl for ChainBFront, InitPayload {
         fn run(&self, payload: InitPayload, jump: ChainJumper<InitPayload>) -> ChainJumpResult {
             println!("Initiated!");
             let mut chain_jumper = self.chain_jumper.write().unwrap();

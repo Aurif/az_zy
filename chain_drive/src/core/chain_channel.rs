@@ -1,11 +1,11 @@
 use std::sync::{Arc, Mutex};
-use crate::core::chain_block::ChainBlock;
+use crate::core::chain_block::{ChainB, ChainBBack, ChainBFront, ChainBlock};
 use crate::core::chain_drive::{ChainJumper, ChainJumperCore};
 use crate::core::common::ChainPayload;
 
 pub struct ChainChannel<P: ChainPayload> {
-    queue_front: Vec<Arc<Mutex<dyn ChainBlock<P>>>>,
-    queue_back: Vec<Arc<Mutex<dyn ChainBlock<P>>>>
+    queue_front: Vec<Arc<Mutex<dyn ChainBlock<P, ChainBFront>>>>,
+    queue_back: Vec<Arc<Mutex<dyn ChainBlock<P, ChainBBack>>>>
 }
 impl<P: ChainPayload> ChainChannel<P> {
     pub fn new() -> ChainChannel<P> {
@@ -15,10 +15,10 @@ impl<P: ChainPayload> ChainChannel<P> {
         }
     }
 
-    pub fn push_front(&mut self, block: Arc<Mutex<dyn ChainBlock<P>>>) {
+    pub fn push_front(&mut self, block: Arc<Mutex<dyn ChainBlock<P, ChainBFront>>>) {
         self.queue_front.push(block);
     }
-    pub fn push_back(&mut self, block: Arc<Mutex<dyn ChainBlock<P>>>) {
+    pub fn push_back(&mut self, block: Arc<Mutex<dyn ChainBlock<P, ChainBBack>>>) {
         self.queue_back.push(block);
     }
 
@@ -37,7 +37,7 @@ impl<P: ChainPayload> ChainChannel<P> {
         }
     }
 
-    fn run_block(&self, block: &Arc<Mutex<dyn ChainBlock<P>>>, payload: P, jump: ChainJumper<P>) {
+    fn run_block<B: ChainB>(&self, block: &Arc<Mutex<dyn ChainBlock<P, B>>>, payload: P, jump: ChainJumper<P>) {
         {
             let guard = block.try_lock().expect("Tried referencing a blocked mutex");
             guard.run(payload, jump)

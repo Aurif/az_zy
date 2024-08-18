@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, RwLock, Weak};
 use crate::{ChainJumpResult};
-use crate::core::chain_block::{ChainBlock, ChainBlockInserter};
+use crate::core::chain_block::{ChainBBack, ChainBFront, ChainBlock, ChainBlockInserter};
 use crate::core::ChainChannel;
 use crate::core::common::ChainPayload;
 
@@ -16,11 +16,11 @@ impl ChainDrive {
         return ChainDrive { core }
     }
 
-    pub fn push_front<P: ChainPayload + 'static>(&mut self, block: Arc<Mutex<dyn ChainBlock<P>>>) {
+    pub fn push_front<P: ChainPayload + 'static>(&mut self, block: Arc<Mutex<dyn ChainBlock<P, ChainBFront>>>) {
         self.core.write().unwrap().get_channel_mut().push_front(block)
     }
 
-    pub fn push_back<P: ChainPayload + 'static>(&mut self, block: Arc<Mutex<dyn ChainBlock<P>>>) {
+    pub fn push_back<P: ChainPayload + 'static>(&mut self, block: Arc<Mutex<dyn ChainBlock<P, ChainBBack>>>) {
         self.core.write().unwrap().get_channel_mut().push_back(block)
     }
 

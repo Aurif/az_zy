@@ -2,7 +2,14 @@ use std::sync::{Arc, Mutex};
 use crate::{ChainDrive, ChainJumper, ChainPayload};
 use crate::core::common::ChainJumpResult;
 
-pub trait ChainBlock<P: ChainPayload>: Send+Sync {
+pub(crate) trait ChainB {}
+pub struct ChainBFront;
+impl ChainB for ChainBFront {}
+pub struct ChainBBack;
+impl ChainB for ChainBBack {}
+
+
+pub trait ChainBlock<P: ChainPayload, B: ChainB>: Send+Sync {
     fn run(&self, payload: P, jump: ChainJumper<P>) -> ChainJumpResult;
 }
 
@@ -29,11 +36,20 @@ impl<R: ChainBlockRef> ChainBlockInserter for Arc<Mutex<R>> {
 
 #[macro_export]
 macro_rules! define_block {
-    ( $vis:vis struct $name:ident; $(impl { $($impl_code:tt)* })? $(impl for $t:ty { $($code:tt)* })* ) => {
+    ( $vis:vis struct $name:ident; $(impl { $($impl_code:tt)* })? $(impl for $pos:ident, $t:ty { $($code:tt)* })* ) => {
         mod __inner {
             pub use std::sync::{Arc, Mutex};
             pub use chain_drive::{ChainDrive};
             pub use chain_drive::in_macro::{ChainBlock, ChainBlockRef};
+            macro_rules! chain_block_insert {
+                (ChainBFront, $ti:ty, $rf:ident, $chain_drive:ident) => {
+                    $chain_drive.push_front($rf.clone() as __inner::Arc<__inner::Mutex<dyn __inner::ChainBlock<$ti, ChainBFront>>>);
+                };
+                (ChainBBack, $ti:ty, $rf:ident, $chain_drive:ident) => {
+                    $chain_drive.push_back($rf.clone() as __inner::Arc<__inner::Mutex<dyn __inner::ChainBlock<$ti, ChainBBack>>>);
+                };
+            }
+            pub(crate) use chain_block_insert;
         }
         $vis struct $name;
         $(
@@ -42,23 +58,32 @@ macro_rules! define_block {
             }
         )?
         $(
-            impl __inner::ChainBlock<$t> for $name {
+            impl __inner::ChainBlock<$t, $pos> for $name {
                 $($code)*
             }
         )*
         impl __inner::ChainBlockRef for $name {
             fn insert_into(self_ref: __inner::Arc<__inner::Mutex<Self>>, chain_drive: &mut __inner::ChainDrive) {
                 $(
-                    chain_drive.push_front(self_ref.clone() as __inner::Arc<__inner::Mutex<dyn __inner::ChainBlock<$t>>>);
+                    __inner::chain_block_insert!($pos, $t, self_ref, chain_drive);
                 )*
             }
         }
     };
-    ( $vis:vis struct $name:ident $({ $($struct_code:tt)* })? $(impl { $($impl_code:tt)* })? $(impl for $t:ty { $($code:tt)* })* ) => {
+    ( $vis:vis struct $name:ident $({ $($struct_code:tt)* })? $(impl { $($impl_code:tt)* })? $(impl for $pos:ident, $t:ty { $($code:tt)* })* ) => {
         mod __inner {
             pub use std::sync::{Arc, Mutex};
             pub use chain_drive::{ChainDrive};
             pub use chain_drive::in_macro::{ChainBlock, ChainBlockRef};
+            macro_rules! chain_block_insert {
+                (ChainBFront, $ti:ty, $rf:ident, $chain_drive:ident) => {
+                    $chain_drive.push_front($rf.clone() as __inner::Arc<__inner::Mutex<dyn __inner::ChainBlock<$ti, ChainBFront>>>);
+                };
+                (ChainBBack, $ti:ty, $rf:ident, $chain_drive:ident) => {
+                    $chain_drive.push_back($rf.clone() as __inner::Arc<__inner::Mutex<dyn __inner::ChainBlock<$ti, ChainBBack>>>);
+                };
+            }
+            pub(crate) use chain_block_insert;
         }
         $vis struct $name $(
             {
@@ -71,14 +96,14 @@ macro_rules! define_block {
             }
         )?
         $(
-            impl __inner::ChainBlock<$t> for $name {
+            impl __inner::ChainBlock<$t, $pos> for $name {
                 $($code)*
             }
         )*
         impl __inner::ChainBlockRef for $name {
             fn insert_into(self_ref: __inner::Arc<__inner::Mutex<Self>>, chain_drive: &mut __inner::ChainDrive) {
                 $(
-                    chain_drive.push_front(self_ref.clone() as __inner::Arc<__inner::Mutex<dyn __inner::ChainBlock<$t>>>);
+                    __inner::chain_block_insert!($pos, $t, self_ref, chain_drive);
                 )*
             }
         }
