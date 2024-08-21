@@ -10,7 +10,7 @@ impl ChainB for ChainBBack {}
 
 
 pub trait ChainBlock<P: ChainPayload, B: ChainB>: Send+Sync {
-    fn run(&self, payload: P, jump: ChainJumper<P>) -> ChainJumpResult;
+    fn run(&mut self, payload: P, jump: ChainJumper<P>) -> ChainJumpResult;
 }
 
 pub trait ChainBlockRef {

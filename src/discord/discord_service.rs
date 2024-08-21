@@ -36,8 +36,8 @@ impl DiscordService {
         block
     }
 
-    pub fn dm_send_block(&mut self) -> DiscordDMSendBlock {
-        DiscordDMSendBlock {}
+    pub fn dm_sender_block(&mut self) -> DiscordDMSenderBlock {
+        DiscordDMSenderBlock {}
     }
 }
 
@@ -80,7 +80,7 @@ define_block!(
         }
     }
     impl for ChainBFront, InitPayload {
-        fn run(&self, payload: InitPayload, jump: ChainJumper<InitPayload>) -> ChainJumpResult {
+        fn run(&mut self, payload: InitPayload, jump: ChainJumper<InitPayload>) -> ChainJumpResult {
             println!("Initiated!");
             let mut chain_jumper = self.chain_jumper.write().unwrap();
             *chain_jumper = Some(jump.get_core());
@@ -90,9 +90,9 @@ define_block!(
 );
 
 define_block!(
-    pub struct DiscordDMSendBlock;
+    pub struct DiscordDMSenderBlock;
     impl for ChainBBack, DiscordDMSendPayload {
-        fn run(&self, payload: DiscordDMSendPayload, jump: ChainJumper<DiscordDMSendPayload>) -> ChainJumpResult {
+        fn run(&mut self, payload: DiscordDMSendPayload, jump: ChainJumper<DiscordDMSendPayload>) -> ChainJumpResult {
             tokio::spawn(async move {
                 payload.user.create_dm_channel(&payload.context_http).await
                     .unwrap().say(&payload.context_http, payload.content).await

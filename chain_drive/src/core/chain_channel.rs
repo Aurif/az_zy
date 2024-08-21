@@ -39,7 +39,7 @@ impl<P: ChainPayload> ChainChannel<P> {
 
     fn run_block<B: ChainB>(&self, block: &Arc<Mutex<dyn ChainBlock<P, B>>>, payload: P, jump: ChainJumper<P>) {
         {
-            let guard = block.try_lock().expect("Tried referencing a blocked mutex");
+            let mut guard = block.try_lock().expect("Tried referencing a blocked mutex");
             guard.run(payload, jump)
         }.enter();
     }
