@@ -1,5 +1,5 @@
-use chain_drive::{ChainDrive, ChainJumper, ChainJumpResult, define_block, ChainBBack, ChainBFront};
-use crate::discord::channels::DiscordDMReceivedPayload;
+use chain_drive::{ChainDrive, ChainJumper, ChainJumpResult, define_block, ChainBBack};
+use crate::discord::channels::{DiscordDMReceivedPayload, DiscordDMAuthorCrumb, DiscordDMSendPayload};
 use crate::discord::DiscordService;
 use crate::openai::channels::{LLMCompletionPayload, RunLLMPromptPayload};
 use crate::openai::OpenAIService;
@@ -14,8 +14,9 @@ async fn main() {
 
     let mut drive = ChainDrive::new();
     drive.insert(discord.dm_listener_block());
-    drive.insert(DmLlmAdapter {});
     drive.insert(openai.prompt_runner_block());
+    drive.insert(discord.dm_send_block());
+    drive.insert(DmLlmAdapter {});
     drive.start();
 
     discord.start().await;
@@ -31,10 +32,15 @@ define_block!(
             })
         }
     }
-    impl for ChainBFront, LLMCompletionPayload {
+    impl for ChainBBack, LLMCompletionPayload {
         fn run(&self, payload: LLMCompletionPayload, jump: ChainJumper<LLMCompletionPayload>) -> ChainJumpResult {
-            println!("Sending \"{}\"", payload.content);
-            jump.stop()
+            let sender = jump.get_crumb::<DiscordDMAuthorCrumb>().unwrap();
+            println!("Sending to {}: \"{}\"", sender.author.name, payload.content);
+            jump.to(DiscordDMSendPayload {
+                content: payload.content,
+                user: sender.author.clone(),
+                context_http: sender.context_http.clone()
+            })
         }
     }
 );

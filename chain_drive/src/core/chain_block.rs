@@ -71,31 +71,27 @@ macro_rules! define_block {
         );
     };
     ( inner $name:ident $(impl for $pos:ident, $t:ty { $($code:tt)* })* ) => {
-        mod __inner {
-            pub use std::sync::{Arc, Mutex};
-            pub use chain_drive::{ChainDrive};
-            pub use chain_drive::in_macro::{ChainBlock, ChainBlockRef};
-            macro_rules! chain_block_insert {
-                (ChainBFront, $ti:ty, $rf:ident, $chain_drive:ident) => {
-                    $chain_drive.push_front($rf.clone() as __inner::Arc<__inner::Mutex<dyn __inner::ChainBlock<$ti, ChainBFront>>>);
-                };
-                (ChainBBack, $ti:ty, $rf:ident, $chain_drive:ident) => {
-                    $chain_drive.push_back($rf.clone() as __inner::Arc<__inner::Mutex<dyn __inner::ChainBlock<$ti, ChainBBack>>>);
-                };
-            }
-            pub(crate) use chain_block_insert;
-        }
         $(
-            impl __inner::ChainBlock<$t, $pos> for $name {
+            impl chain_drive::in_macro::ChainBlock<$t, $pos> for $name {
                 $($code)*
             }
         )*
-        impl __inner::ChainBlockRef for $name {
-            fn insert_into(self_ref: __inner::Arc<__inner::Mutex<Self>>, chain_drive: &mut __inner::ChainDrive) {
+        impl chain_drive::in_macro::ChainBlockRef for $name {
+            fn insert_into(self_ref: std::sync::Arc<std::sync::Mutex<Self>>, chain_drive: &mut chain_drive::ChainDrive) {
                 $(
-                    __inner::chain_block_insert!($pos, $t, self_ref, chain_drive);
+                    chain_drive::__chain_block_insert!($pos, $t, self_ref, chain_drive);
                 )*
             }
         }
     }
+}
+
+#[macro_export]
+macro_rules! __chain_block_insert {
+    (ChainBFront, $ti:ty, $rf:ident, $chain_drive:ident) => {
+        $chain_drive.push_front($rf.clone() as std::sync::Arc<std::sync::Mutex<dyn chain_drive::in_macro::ChainBlock<$ti, ChainBFront>>>);
+    };
+    (ChainBBack, $ti:ty, $rf:ident, $chain_drive:ident) => {
+        $chain_drive.push_back($rf.clone() as std::sync::Arc<std::sync::Mutex<dyn chain_drive::in_macro::ChainBlock<$ti, ChainBBack>>>);
+    };
 }

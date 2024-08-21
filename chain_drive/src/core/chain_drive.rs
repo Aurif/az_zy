@@ -2,7 +2,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex, RwLock, Weak};
-use crate::{ChainJumpResult};
+use crate::{ChainCrumb, ChainJumpResult};
 use crate::core::chain_block::{ChainBBack, ChainBFront, ChainBlock, ChainBlockInserter};
 use crate::core::ChainChannel;
 use crate::core::common::ChainPayload;
@@ -29,9 +29,9 @@ impl ChainDrive {
     }
 
     pub fn start(&self) {
-        let jumper = ChainJumperCore {
-            drive_core: Arc::downgrade(&self.core)
-        };
+        let jumper = ChainJumperCore::new(
+            Arc::downgrade(&self.core)
+        );
         jumper.direct_to(InitPayload {}, 0).enter()
     }
 }
@@ -70,9 +70,17 @@ impl ChainDriveCore {
 
 #[derive(Clone)]
 pub struct ChainJumperCore {
-    drive_core: Weak<RwLock<ChainDriveCore>>
+    drive_core: Weak<RwLock<ChainDriveCore>>,
+    crumbs: HashMap<TypeId, Arc<dyn Any+Send+Sync>>
 }
 impl ChainJumperCore {
+    fn new(core: Weak<RwLock<ChainDriveCore>>) -> ChainJumperCore {
+        ChainJumperCore {
+            drive_core: core,
+            crumbs: HashMap::new()
+        }
+    }
+
     fn direct_to<P: ChainPayload + 'static>(&self, payload: P, index: usize) -> ChainJumpResult {
         if let Some(core) = self.drive_core.upgrade() {
             let self_clone = self.clone();
@@ -93,6 +101,12 @@ impl ChainJumperCore {
             next_index,
             phantom: PhantomData
         }
+    }
+
+    pub fn add_crumb<C: ChainCrumb>(&self, crumb: C) -> ChainJumperCore {
+        let mut jumper = self.clone();
+        jumper.crumbs.insert(TypeId::of::<C>(), Arc::new(crumb));
+        jumper
     }
 }
 
@@ -116,6 +130,14 @@ impl<N: ChainPayload + 'static> ChainJumper<N> {
 
     pub fn get_core(&self) -> ChainJumperCore {
         self.core.clone()
+    }
+
+    pub fn get_crumb<C: ChainCrumb>(&self) -> Option<Arc<C>> {
+        self.core.crumbs.get(&TypeId::of::<C>()).and_then(|c| {
+            let arc_any = c.clone();
+            let downcasted = arc_any.downcast::<C>().ok()?;
+            Some(downcasted)
+        })
     }
 }
 

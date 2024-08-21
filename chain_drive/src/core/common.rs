@@ -1,3 +1,5 @@
+use std::any::Any;
+
 pub trait ChainPayload {}
 
 pub struct ChainJumpResult {
@@ -19,3 +21,5 @@ impl ChainJumpResult {
         (self.func)()
     }
 }
+
+pub trait ChainCrumb: Any+Send+Sync {}

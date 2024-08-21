@@ -1,8 +1,8 @@
 use std::sync::{Arc, Mutex, RwLock, Weak};
-use chain_drive::{ChainBFront, ChainJumper, ChainJumperCore, ChainJumpResult, define_block, InitPayload};
+use chain_drive::{ChainBBack, ChainBFront, ChainJumper, ChainJumperCore, ChainJumpResult, define_block, InitPayload};
 use serenity::{async_trait, Client};
 use serenity::all::{Context, EventHandler, GatewayIntents, Message};
-use crate::discord::channels::DiscordDMReceivedPayload;
+use crate::discord::channels::{DiscordDMReceivedPayload, DiscordDMAuthorCrumb, DiscordDMSendPayload};
 
 pub struct DiscordService {
     handler: DiscordServiceHandler
@@ -35,6 +35,10 @@ impl DiscordService {
         self.handler.message_listeners.push(Arc::downgrade(&block));
         block
     }
+
+    pub fn dm_send_block(&mut self) -> DiscordDMSendBlock {
+        DiscordDMSendBlock {}
+    }
 }
 
 struct DiscordServiceHandler {
@@ -61,9 +65,15 @@ define_block!(
                 chain_jumper: RwLock::new(None)
             }
         }
-        fn message(&self, _ctx: &Context, msg: &Message) {
+        fn message(&self, ctx: &Context, msg: &Message) {
+            if msg.author.bot {return}
             if let Some(jumper) = self.chain_jumper.read().unwrap().as_ref() {
-                jumper.emit(DiscordDMReceivedPayload {
+                jumper.add_crumb(
+                    DiscordDMAuthorCrumb {
+                        author: msg.author.clone(),
+                        context_http: ctx.http.clone()
+                    }
+                ).emit(DiscordDMReceivedPayload {
                     content: msg.content.clone()
                 })
             }
@@ -75,6 +85,19 @@ define_block!(
             let mut chain_jumper = self.chain_jumper.write().unwrap();
             *chain_jumper = Some(jump.get_core());
             jump.next(payload)
+        }
+    }
+);
+
+define_block!(
+    pub struct DiscordDMSendBlock;
+    impl for ChainBBack, DiscordDMSendPayload {
+        fn run(&self, payload: DiscordDMSendPayload, jump: ChainJumper<DiscordDMSendPayload>) -> ChainJumpResult {
+            tokio::spawn(async move {
+                payload.user.create_dm_channel(&payload.context_http).await
+                    .unwrap().say(&payload.context_http, payload.content).await
+            });
+            jump.stop()
         }
     }
 );
