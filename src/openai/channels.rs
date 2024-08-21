@@ -15,3 +15,9 @@ pub struct LLMCompletionPayload {
     pub content: String
 }
 impl ChainPayload for LLMCompletionPayload {}
+
+
+pub struct SystemPromptPayload {
+    pub system_prompt: String
+}
+impl ChainPayload for SystemPromptPayload {}

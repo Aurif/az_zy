@@ -1,11 +1,11 @@
 use std::ops::Deref;
 use std::sync::Arc;
-use chain_drive::{ChainBBack, ChainJumper, ChainJumpResult, define_block};
+use chain_drive::{ChainBBack, ChainBFront, ChainJumper, ChainJumpResult, define_block};
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion;
 use openai_api_rs::v1::chat_completion::{ChatCompletionRequest};
 use openai_api_rs::v1::common::GPT4_O_MINI;
-use crate::openai::channels::{LLMChatMessagePayload, LLMCompletionPayload, RunLLMPromptPayload};
+use crate::openai::channels::{LLMChatMessagePayload, LLMCompletionPayload, RunLLMPromptPayload, SystemPromptPayload};
 
 pub struct OpenAIService {
     client: Arc<OpenAIClient>
@@ -22,6 +22,9 @@ impl OpenAIService {
     }
     pub fn chat_interface_block(&self) -> ChatInterfaceBlock {
         ChatInterfaceBlock::new()
+    }
+    pub fn constant_system_prompt_block(&self, prompt: String) -> ConstantSystemPromptBlock {
+        ConstantSystemPromptBlock { prompt }
     }
 }
 
@@ -51,12 +54,14 @@ define_block!(
 
 define_block!(
     pub struct ChatInterfaceBlock {
-        history: Vec<String>
+        history: Vec<String>,
+        system_prompt: Option<String>
     }
     impl {
         fn new() -> ChatInterfaceBlock {
             ChatInterfaceBlock {
-                history: Vec::new()
+                history: Vec::new(),
+                system_prompt: None
             }
         }
         fn append_history(&mut self, message: String, parity: usize) {
@@ -69,12 +74,8 @@ define_block!(
                 }
             };
         }
-    }
-    impl for ChainBBack, LLMChatMessagePayload {
-         fn run(&mut self, payload: LLMChatMessagePayload, jump: ChainJumper<LLMChatMessagePayload>) -> ChainJumpResult {
-            self.append_history(payload.message, 0);
-
-            let prompt: Vec<_> = self.history.iter()
+        fn form_prompt(&self) -> Vec<chat_completion::ChatCompletionMessage> {
+            let mut prompt: Vec<_> = self.history.iter()
                 .enumerate()
                 .map(|(index, value)| {
                     chat_completion::ChatCompletionMessage {
@@ -86,8 +87,24 @@ define_block!(
                     }
                 })
                 .collect();
+            prompt.insert(0, chat_completion::ChatCompletionMessage {
+                role: chat_completion::MessageRole::system,
+                content: chat_completion::Content::Text(self.system_prompt.clone().unwrap()),
+                name: None,
+                tool_calls: None,
+                tool_call_id: None,
+            });
+            prompt
+        }
+    }
+    impl for ChainBBack, LLMChatMessagePayload {
+         fn run(&mut self, payload: LLMChatMessagePayload, jump: ChainJumper<LLMChatMessagePayload>) -> ChainJumpResult {
+            self.append_history(payload.message, 0);
+            if self.system_prompt == None {
+                return jump.to(SystemPromptPayload{system_prompt: "".to_string()})
+            }
 
-            jump.to(RunLLMPromptPayload { prompt } )
+            jump.to(RunLLMPromptPayload { prompt: self.form_prompt() } )
         }
     }
     impl for ChainBBack, LLMCompletionPayload {
@@ -95,5 +112,24 @@ define_block!(
             self.append_history(payload.content.clone(), 1);
             jump.next(payload)
          }
+    }
+    impl for ChainBBack, SystemPromptPayload {
+         fn run(&mut self, payload: SystemPromptPayload, jump: ChainJumper<SystemPromptPayload>) -> ChainJumpResult {
+            self.system_prompt = Some(payload.system_prompt);
+            jump.to(RunLLMPromptPayload { prompt: self.form_prompt() } )
+         }
+    }
+);
+
+define_block!(
+    pub struct ConstantSystemPromptBlock {
+        prompt: String
+    }
+    impl for ChainBFront, SystemPromptPayload {
+         fn run(&mut self, payload: SystemPromptPayload, jump: ChainJumper<SystemPromptPayload>) -> ChainJumpResult {
+            jump.next(SystemPromptPayload {
+                system_prompt: self.prompt.clone()
+            })
+        }
     }
 );
