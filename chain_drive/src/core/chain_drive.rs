@@ -139,6 +139,14 @@ impl<N: ChainPayload + 'static> ChainJumper<N> {
             Some(downcasted)
         })
     }
+
+    pub fn add_crumb<C: ChainCrumb>(&self, crumb: C) -> ChainJumper<N> {
+        ChainJumper {
+            core: self.core.add_crumb(crumb),
+            next_index: self.next_index.clone(),
+            phantom: PhantomData,
+        }
+    }
 }
 
 pub struct InitPayload;

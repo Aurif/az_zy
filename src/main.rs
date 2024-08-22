@@ -15,8 +15,8 @@ async fn main() {
     let mut drive = ChainDrive::new();
     drive.insert(DmLlmAdapter {});
     drive.insert(discord.dm_listener_block());
-    drive.insert(openai.chat_interface_block());
     drive.insert(openai.constant_system_prompt_block("You are trying to pass the turing test. Keep your messages to bare minimum.".to_string()));
+    drive.insert(openai.chat_interface_block());
     drive.insert(openai.prompt_runner_block());
     drive.insert(discord.dm_sender_block());
     drive.start();

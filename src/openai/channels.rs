@@ -1,4 +1,4 @@
-use chain_drive::ChainPayload;
+use chain_drive::{ChainCrumb, ChainPayload};
 use openai_api_rs::v1::chat_completion;
 
 pub struct RunLLMPromptPayload {
@@ -21,3 +21,8 @@ pub struct SystemPromptPayload {
     pub system_prompt: String
 }
 impl ChainPayload for SystemPromptPayload {}
+
+pub struct FullChatHistoryCrumb {
+    pub prompt: Vec<chat_completion::ChatCompletionMessage>
+}
+impl ChainCrumb for FullChatHistoryCrumb {}

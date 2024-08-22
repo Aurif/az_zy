@@ -1,11 +1,10 @@
-use std::sync::{Arc, Mutex, RwLock, Weak};
-use chain_drive::{ChainBBack, ChainBFront, ChainJumper, ChainJumperCore, ChainJumpResult, define_block, InitPayload};
+use std::sync::{Mutex, Weak};
 use serenity::{async_trait, Client};
 use serenity::all::{Context, EventHandler, GatewayIntents, Message};
-use crate::discord::channels::{DiscordDMReceivedPayload, DiscordDMAuthorCrumb, DiscordDMSendPayload};
+use crate::discord::blocks::dm_listener_block::DMListenerBlock;
 
 pub struct DiscordService {
-    handler: DiscordServiceHandler
+    pub(super) handler: DiscordServiceHandler
 }
 impl DiscordService {
     pub async fn new() -> DiscordService {
@@ -29,20 +28,10 @@ impl DiscordService {
             println!("Discord client error: {why:?}");
         }
     }
-
-    pub fn dm_listener_block(&mut self) -> Arc<Mutex<DiscordDMListenerBlock>> {
-        let block = Arc::new(Mutex::new(DiscordDMListenerBlock::new()));
-        self.handler.message_listeners.push(Arc::downgrade(&block));
-        block
-    }
-
-    pub fn dm_sender_block(&mut self) -> DiscordDMSenderBlock {
-        DiscordDMSenderBlock {}
-    }
 }
 
-struct DiscordServiceHandler {
-    message_listeners: Vec<Weak<Mutex<DiscordDMListenerBlock>>>
+pub(super) struct DiscordServiceHandler {
+    pub(super) message_listeners: Vec<Weak<Mutex<DMListenerBlock>>>
 }
 #[async_trait]
 impl EventHandler for DiscordServiceHandler {
@@ -54,50 +43,3 @@ impl EventHandler for DiscordServiceHandler {
         }
     }
 }
-
-define_block!(
-    pub struct DiscordDMListenerBlock {
-        chain_jumper: RwLock<Option<ChainJumperCore>>
-    }
-    impl {
-        fn new<'a>() -> DiscordDMListenerBlock {
-            DiscordDMListenerBlock {
-                chain_jumper: RwLock::new(None)
-            }
-        }
-        fn message(&self, ctx: &Context, msg: &Message) {
-            if msg.author.bot {return}
-            if let Some(jumper) = self.chain_jumper.read().unwrap().as_ref() {
-                jumper.add_crumb(
-                    DiscordDMAuthorCrumb {
-                        author: msg.author.clone(),
-                        context_http: ctx.http.clone()
-                    }
-                ).emit(DiscordDMReceivedPayload {
-                    content: msg.content.clone()
-                })
-            }
-        }
-    }
-    impl for ChainBFront, InitPayload {
-        fn run(&mut self, payload: InitPayload, jump: ChainJumper<InitPayload>) -> ChainJumpResult {
-            println!("Initiated!");
-            let mut chain_jumper = self.chain_jumper.write().unwrap();
-            *chain_jumper = Some(jump.get_core());
-            jump.next(payload)
-        }
-    }
-);
-
-define_block!(
-    pub struct DiscordDMSenderBlock;
-    impl for ChainBBack, DiscordDMSendPayload {
-        fn run(&mut self, payload: DiscordDMSendPayload, jump: ChainJumper<DiscordDMSendPayload>) -> ChainJumpResult {
-            tokio::spawn(async move {
-                payload.user.create_dm_channel(&payload.context_http).await
-                    .unwrap().say(&payload.context_http, payload.content).await
-            });
-            jump.stop()
-        }
-    }
-);
