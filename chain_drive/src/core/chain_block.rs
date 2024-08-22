@@ -9,7 +9,7 @@ pub struct ChainBBack;
 impl ChainB for ChainBBack {}
 
 
-pub trait ChainBlock<P: ChainPayload, B: ChainB>: Send+Sync {
+pub trait ChainBlock<P: ChainPayload, B: ChainB>: Send + Sync {
     fn run(&mut self, payload: P, jump: ChainJumper<P>) -> ChainJumpResult;
 }
 
@@ -36,50 +36,11 @@ impl<R: ChainBlockRef> ChainBlockInserter for Arc<Mutex<R>> {
 
 #[macro_export]
 macro_rules! define_block {
-    ( $vis:vis struct $name:ident; $(impl { $($impl_code:tt)* })? $(impl for $pos:ident, $t:ty { $($code:tt)* })* ) => {
-        $vis struct $name;
-        $(
-            impl $name {
-                $($impl_code)*
-            }
-        )?
-        define_block!(inner $name
-            $(
-                impl for $pos, $t {
-                    $($code)*
-                }
-            )*
-        );
-    };
-    ( $vis:vis struct $name:ident $({ $($struct_code:tt)* })? $(impl { $($impl_code:tt)* })? $(impl for $pos:ident, $t:ty { $($code:tt)* })* ) => {
-        $vis struct $name $(
-            {
-                $($struct_code)*
-            }
-        )?
-        $(
-            impl $name {
-                $($impl_code)*
-            }
-        )?
-        define_block!(inner $name
-            $(
-                impl for $pos, $t {
-                    $($code)*
-                }
-            )*
-        );
-    };
-    ( inner $name:ident $(impl for $pos:ident, $t:ty { $($code:tt)* })* ) => {
-        $(
-            impl chain_drive::in_macro::ChainBlock<$t, $pos> for $name {
-                $($code)*
-            }
-        )*
+    ( $name:ident: $($payload:ty, $pos:ident);* $(;)?) => {
         impl chain_drive::in_macro::ChainBlockRef for $name {
             fn insert_into(self_ref: std::sync::Arc<std::sync::Mutex<Self>>, chain_drive: &mut chain_drive::ChainDrive) {
                 $(
-                    chain_drive::__chain_block_insert!($pos, $t, self_ref, chain_drive);
+                    chain_drive::__chain_block_insert!($pos, $payload, self_ref, chain_drive);
                 )*
             }
         }
@@ -89,9 +50,9 @@ macro_rules! define_block {
 #[macro_export]
 macro_rules! __chain_block_insert {
     (ChainBFront, $ti:ty, $rf:ident, $chain_drive:ident) => {
-        $chain_drive.push_front($rf.clone() as std::sync::Arc<std::sync::Mutex<dyn chain_drive::in_macro::ChainBlock<$ti, ChainBFront>>>);
+        $chain_drive.push_front($rf.clone() as std::sync::Arc<std::sync::Mutex<dyn chain_drive::ChainBlock<$ti, ChainBFront>>>);
     };
     (ChainBBack, $ti:ty, $rf:ident, $chain_drive:ident) => {
-        $chain_drive.push_back($rf.clone() as std::sync::Arc<std::sync::Mutex<dyn chain_drive::in_macro::ChainBlock<$ti, ChainBBack>>>);
+        $chain_drive.push_back($rf.clone() as std::sync::Arc<std::sync::Mutex<dyn chain_drive::ChainBlock<$ti, ChainBBack>>>);
     };
 }

@@ -1,4 +1,4 @@
-use chain_drive::{ChainBFront, ChainJumper, ChainJumpResult, define_block};
+use chain_drive::{ChainBFront, ChainJumper, ChainJumpResult, ChainBlock, define_block};
 use crate::openai::channels::SystemPromptPayload;
 use crate::openai::OpenAIService;
 
@@ -8,15 +8,15 @@ impl OpenAIService {
     }
 }
 
-define_block!(
-    pub struct ConstantSystemPromptBlock {
-        prompt: String
+pub struct ConstantSystemPromptBlock {
+    prompt: String
+}
+impl ChainBlock<SystemPromptPayload, ChainBFront> for ConstantSystemPromptBlock {
+     fn run(&mut self, _payload: SystemPromptPayload, jump: ChainJumper<SystemPromptPayload>) -> ChainJumpResult {
+        jump.next(SystemPromptPayload {
+            system_prompt: self.prompt.clone()
+        })
     }
-    impl for ChainBFront, SystemPromptPayload {
-         fn run(&mut self, _payload: SystemPromptPayload, jump: ChainJumper<SystemPromptPayload>) -> ChainJumpResult {
-            jump.next(SystemPromptPayload {
-                system_prompt: self.prompt.clone()
-            })
-        }
-    }
-);
+}
+
+define_block!(ConstantSystemPromptBlock: SystemPromptPayload, ChainBFront);
