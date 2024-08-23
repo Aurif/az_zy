@@ -98,7 +98,7 @@ impl ChainBlock<ClearStatePayload, ChainBFront> for ChatStatePreserverBlock {
                 });
                 summary.push(completion);
             }
-            println!("{}", summary.join("\n\n"));
+            println!("\n{}\n", summary.join("\n\n"));
             fs::write("./chat_cache.txt", summary.join("\n\n")).expect("Unable to write file");
         });
 

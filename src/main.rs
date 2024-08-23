@@ -24,7 +24,8 @@ async fn main() {
     drive.insert(openai.chat_interface_block());
     drive.insert(openai.prompt_runner_block());
     drive.insert(discord.dm_sender_block());
-    drive.insert(timing.delayed_debounced_call_block::<DiscordDMReceivedPayload, _>(Duration::from_secs(30), || { ClearStatePayload {} }));
+    drive.insert(timing.delayed_debounced_call_block::<DiscordDMReceivedPayload, _>(Duration::from_secs(2 * 3600), || { ClearStatePayload {} }));
+    drive.insert(timing.delayed_debounced_call_block::<DiscordDMReceivedPayload, _>(Duration::from_secs(22 * 3600), || { DiscordDMReceivedPayload { content: "SYSTEM PROMPT: Strike up a casual conversation".to_string() } }));
     drive.start();
 
     tokio::join!(
