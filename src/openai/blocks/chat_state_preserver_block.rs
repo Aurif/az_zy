@@ -1,6 +1,6 @@
 use std::fs;
 use std::ops::Deref;
-use crate::openai::channels::{FullChatHistoryCrumb, LLMCompletionPayload, SystemPromptPayload};
+use crate::openai::channels::{ClearStatePayload, FullChatHistoryCrumb, LLMCompletionPayload, SystemPromptPayload};
 use crate::openai::OpenAIService;
 use chain_drive::{
     define_block, ChainBBack, ChainBFront, ChainBlock, ChainJumpResult, ChainJumper,
@@ -8,7 +8,7 @@ use chain_drive::{
 use openai_api_rs::v1::api::OpenAIClient;
 use openai_api_rs::v1::chat_completion;
 use openai_api_rs::v1::chat_completion::ChatCompletionRequest;
-use openai_api_rs::v1::common::{GPT4, GPT4_O, GPT4_O_MINI};
+use openai_api_rs::v1::common::{GPT4_O};
 use std::sync::Arc;
 
 impl OpenAIService {
@@ -63,8 +63,12 @@ impl ChainBlock<SystemPromptPayload, ChainBFront> for ChatStatePreserverBlock {
     }
 }
 
-impl Drop for ChatStatePreserverBlock {
-    fn drop(&mut self) {
+impl ChainBlock<ClearStatePayload, ChainBFront> for ChatStatePreserverBlock {
+    fn run(
+        &mut self,
+        payload: ClearStatePayload,
+        jump: ChainJumper<ClearStatePayload>,
+    ) -> ChainJumpResult {
         let mut history = self.history.history.clone();
         let prompts = self.summary_prompts.clone();
         let client = self.client.clone();
@@ -97,10 +101,17 @@ impl Drop for ChatStatePreserverBlock {
             println!("{}", summary.join("\n\n"));
             fs::write("./chat_cache.txt", summary.join("\n\n")).expect("Unable to write file");
         });
+
+
+        self.history = Arc::new(FullChatHistoryCrumb {
+            history: Vec::new(),
+        });
+        jump.next(payload)
     }
 }
 
 define_block!(ChatStatePreserverBlock:
     SystemPromptPayload, ChainBFront;
     LLMCompletionPayload, ChainBBack;
+    ClearStatePayload, ChainBFront;
 );

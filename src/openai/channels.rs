@@ -22,6 +22,10 @@ pub struct SystemPromptPayload {
 }
 impl ChainPayload for SystemPromptPayload {}
 
+pub struct ClearStatePayload;
+impl ChainPayload for ClearStatePayload {}
+
+
 pub struct FullChatHistoryCrumb {
     pub history: Vec<chat_completion::ChatCompletionMessage>,
 }

@@ -1,19 +1,20 @@
 use std::time::Duration;
 use chain_drive::{ChainDrive, ChainJumper, ChainJumpResult, define_block, ChainBBack, ChainBlock};
-use tokio::time::sleep;
 use crate::discord::channels::{DiscordDMReceivedPayload, DiscordDMAuthorCrumb, DiscordDMSendPayload};
 use crate::discord::DiscordService;
-use crate::openai::channels::{LLMChatMessagePayload, LLMCompletionPayload};
+use crate::openai::channels::{LLMChatMessagePayload, LLMCompletionPayload, ClearStatePayload};
 use crate::openai::OpenAIService;
+use crate::timing::TimingService;
 
 mod discord;
 mod openai;
+mod timing;
 
 #[tokio::main]
 async fn main() {
     let mut discord = DiscordService::new().await;
     let openai = OpenAIService::new();
-
+    let timing = TimingService::new();
 
     let mut drive = ChainDrive::new();
     drive.insert(DmLlmAdapter {});
@@ -23,17 +24,12 @@ async fn main() {
     drive.insert(openai.chat_interface_block());
     drive.insert(openai.prompt_runner_block());
     drive.insert(discord.dm_sender_block());
+    drive.insert(timing.delayed_debounced_call_block::<DiscordDMReceivedPayload, _>(Duration::from_secs(30), || { ClearStatePayload {} }));
     drive.start();
 
     tokio::join!(
-        dropper(drive),
         discord.start()
     );
-}
-
-async fn dropper<T>(drive: T) {
-    let moved = drive;
-    sleep(Duration::from_secs(60)).await;
 }
 
 struct DmLlmAdapter;

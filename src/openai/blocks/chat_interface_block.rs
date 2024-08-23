@@ -1,7 +1,7 @@
 use std::ops::Deref;
-use chain_drive::{ChainBBack, ChainBlock, ChainJumper, ChainJumpResult, define_block};
+use chain_drive::{ChainBBack, ChainBFront, ChainBlock, ChainJumper, ChainJumpResult, define_block};
 use openai_api_rs::v1::chat_completion;
-use crate::openai::channels::{FullChatHistoryCrumb, LLMChatMessagePayload, LLMCompletionPayload, RunLLMPromptPayload, SystemPromptPayload};
+use crate::openai::channels::{ClearStatePayload, FullChatHistoryCrumb, LLMChatMessagePayload, LLMCompletionPayload, RunLLMPromptPayload, SystemPromptPayload};
 use crate::openai::OpenAIService;
 
 impl OpenAIService {
@@ -80,8 +80,17 @@ impl ChainBlock<SystemPromptPayload, ChainBBack> for ChatInterfaceBlock {
     }
 }
 
+impl ChainBlock<ClearStatePayload, ChainBFront> for ChatInterfaceBlock {
+    fn run(&mut self, payload: ClearStatePayload, jump: ChainJumper<ClearStatePayload>) -> ChainJumpResult {
+        self.system_prompt = None;
+        self.history = Vec::new();
+        jump.next(payload)
+    }
+}
+
 define_block!(ChatInterfaceBlock:
     LLMChatMessagePayload, ChainBBack;
     LLMCompletionPayload, ChainBBack;
     SystemPromptPayload, ChainBBack;
+    ClearStatePayload, ChainBFront;
 );
