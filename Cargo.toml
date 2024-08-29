@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+openssl = { version = "0.10.66", features = ["vendored"] }
 chain_drive = { path = "chain_drive" }
 tokio = { version = "1.39.2", features = ["full"] }
 serenity = "0.12.2"
